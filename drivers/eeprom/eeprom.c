@@ -27,7 +27,7 @@
 
 ****************************************************************************/
 
-#include "LPC11Axx.h"
+#include "LPC11Uxx.h"
 #include "eeprom.h"
 
 #define IAP_LOCATION 0x1FFF1FF1

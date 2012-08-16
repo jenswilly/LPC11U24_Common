@@ -159,10 +159,10 @@ ALIGN4 const uint8_t VCOM_StringDescriptor[] = {
   /* Index 0x03: Serial Number */
   (4*2 + 2),                        /* bLength (4 Char + Type + lenght) */
   USB_STRING_DESCRIPTOR_TYPE,        /* bDescriptorType */
-  'A', 0,
-  'B', 0,
-  'C', 0,
-  'D', 0,
+  'J', 0,
+  'W', 0,
+  'J', 0,
+  'X', 0,
 /* Index 0x04: Interface 0, Alternate Setting 0 */
   ( 4*2 + 2),                        /* bLength (4 Char + Type + lenght) */
   USB_STRING_DESCRIPTOR_TYPE,        /* bDescriptorType */
