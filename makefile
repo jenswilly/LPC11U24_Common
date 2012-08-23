@@ -26,7 +26,7 @@
 # Define project name and MCU here
 PROJECT        = project
 MCU			   = cortex-m0
-SYSCALLS	   = 0
+SYSCALLS	   = 0		# define as 1 to compile the common/syscalls.c file
 
 # Use '.' for no common dir. Do not use trailing slash
 COMMONDIR	   = ./common_LPC11U24
