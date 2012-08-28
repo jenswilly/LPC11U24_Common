@@ -155,7 +155,7 @@ void ModemInit( void )
 *****************************************************************************/
 void UARTInit( uint32_t baudrate )
 {
-	uint32_t regVal; // __attribute__((unused));	// Warnings are as bad as errors, rememberâ€¦
+	uint32_t regVal; // __attribute__((unused));	// Warnings are as bad as errors, remember
 
 	UARTTxEmpty = 1;
 	UARTCount = 0;
@@ -252,6 +252,17 @@ void UARTSend(uint8_t *BufferPtr, uint32_t Length)
 	return;
 }
 
+/* USART interrupt handler.
+ * Since we have set only RBRINTEN in LPC_USART->IER we get only "data ready" interrupts and need not check for Receive Line Status etc.
+ * Weak implementation that does nothing Ð replace this with your own function.
+ */
+__attribute__ ((weak)) void UART_IRQHandler(void)
+{
+	// Get data into buffer. Reading RBR clears interrupt.
+	uint8_t data __attribute__((unused));
+	data = LPC_USART->RBR;
+//	UARTbuffer[ UARTbufferPtr++ ] = LPC_USART->RBR;
+}
 /******************************************************************************
 **                            End Of File
 ******************************************************************************/

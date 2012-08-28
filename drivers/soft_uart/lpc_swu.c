@@ -387,8 +387,8 @@ void swu_init(LPC_CTxxBx_Type* const UART_TIMER) {
 	 you use below module because JTAG and TIMER CAP/MAT pins are muxed. */
 	LPC_SYSCON->SYSAHBCLKCTRL |= (1 << 9);
 
-	LPC_IOCON->PIO1_17 &= ~0x07; /*  Timer0_32 I/O config */
-	LPC_IOCON->PIO1_17 |= 0x02; /* Timer0_32 CAP0 */
+	LPC_IOCON->PIO0_17 &= ~0x07; /*  Timer0_32 I/O config */
+	LPC_IOCON->PIO0_17 |= 0x02; /* Timer0_32 CAP0 */
 	LPC_IOCON->TDI_PIO0_11 &= ~0x07;
 	LPC_IOCON->TDI_PIO0_11 |= 0x03; /* Timer0_32 MAT3 */
 
