@@ -45,6 +45,8 @@ typedef struct VCOM_DATA {
 
 // Global data structure
 VCOM_DATA_T g_vCOM;
+uint8_t rxbuf[USB_HS_MAX_BULK_PACKET] __attribute__((section("USBRAM")));
+uint8_t txbuf[USB_HS_MAX_BULK_PACKET] __attribute__((section("USBRAM")));
 
 // Private function prototypes
 ErrorCode_t VCOM_bulk_out_hdlr(USBD_HANDLE_T hUsb, void* data, uint32_t event);
@@ -73,8 +75,10 @@ ErrorCode_t USB_CDC_init(void)
 	  /* initialize call back structures */
 	  memset((void*)&usb_param, 0, sizeof(USBD_API_INIT_PARAM_T));
 	  usb_param.usb_reg_base = LPC_USB_BASE;
-	  usb_param.mem_base = 0x10001000;
-	  usb_param.mem_size = 0x1000;
+//	  usb_param.mem_base = 0x10001000;	// Top of RAM is at 0x10001800 for LPC11U2x/301 devices
+//	  usb_param.mem_size = 0x0800;		// 6 kb for LPC11U2x/301 devices
+	  usb_param.mem_base = 0x20004800;
+	  usb_param.mem_size = 0x0800;
 	  usb_param.max_num_ep = 3;
 
 	  /* init CDC params */
@@ -117,34 +121,29 @@ ErrorCode_t USB_CDC_init(void)
 //	g_vCOM.send_fn = VCOM_usb_send;
 
 	/* allocate transfer buffers */
-	g_vCOM.rxBuf = (uint8_t*)(cdc_param.mem_base + (0 * USB_HS_MAX_BULK_PACKET));
-	g_vCOM.txBuf = (uint8_t*)(cdc_param.mem_base + (1 * USB_HS_MAX_BULK_PACKET));
+//	g_vCOM.rxBuf = (uint8_t*)(cdc_param.mem_base + (0 * USB_HS_MAX_BULK_PACKET));
+//	g_vCOM.txBuf = (uint8_t*)(cdc_param.mem_base + (1 * USB_HS_MAX_BULK_PACKET));
+	g_vCOM.rxBuf = rxbuf;
+	g_vCOM.txBuf = txbuf;
 	cdc_param.mem_size -= (4 * USB_HS_MAX_BULK_PACKET);
 
 	/* register endpoint interrupt handler */
 	ep_indx = (((USB_CDC_EP_BULK_IN & 0x0F) << 1) + 1);
-	ret = pUsbApi->core->RegisterEpHandler (hUsb, ep_indx, VCOM_bulk_in_hdlr, &g_vCOM);
+	ret = pUsbApi->core->RegisterEpHandler( hUsb, ep_indx, VCOM_bulk_in_hdlr, &g_vCOM );
 	if( ret != LPC_OK )
 		return ret;
 
 	/* register endpoint interrupt handler */
 	ep_indx = ((USB_CDC_EP_BULK_OUT & 0x0F) << 1);
-	ret = pUsbApi->core->RegisterEpHandler (hUsb, ep_indx, VCOM_bulk_out_hdlr, &g_vCOM);
+	ret = pUsbApi->core->RegisterEpHandler( hUsb, ep_indx, VCOM_bulk_out_hdlr, &g_vCOM );
 	if( ret != LPC_OK )
 		return ret;
 
-	/* enable IRQ */
-	NVIC_EnableIRQ(USB_IRQn); //  enable USB0 interrrupts
-#if defined(UART_BRIDGE)
-	g_vCOM.send_fn = VCOM_uart_send;
-	/* init UART for bridge */
-	init_uart1_bridge(&g_vCOM, 0);
-	/* enable IRQ */
-	NVIC_EnableIRQ(UART_IRQn); //  enable Uart interrrupt
-#endif
+	// Enable USB interrupts
+	NVIC_EnableIRQ(USB_IRQn);
 
 	/* USB Connect */
-	pUsbApi->hw->Connect(hUsb, 1);
+	pUsbApi->hw->Connect( hUsb, 1 );
 
 	return LPC_OK;
 }
@@ -217,11 +216,22 @@ ErrorCode_t VCOM_SendBreak (USBD_HANDLE_T hCDC, uint16_t mstime)
  */
 ErrorCode_t VCOM_bulk_in_hdlr(USBD_HANDLE_T hUsb, void* data, uint32_t event)
 {
-//  VCOM_DATA_T* pVcom = (VCOM_DATA_T*) data;
-//  Not needed as WriteEP() is called in VCOM_usb_send() immediately.
-//  if (event == USB_EVT_IN) {
-//  }
-  return LPC_OK;
+	/*
+	VCOM_DATA_T* pVcom = (VCOM_DATA_T*) data;
+	if (event == USB_EVT_IN)
+	{
+		// If we have data in the pxbuf, send it
+		if( pVcom->txlen )
+		{
+			// Buffer non-empty: send it
+			pUsbApi->hw->WriteEP( pVcom->hUsb, USB_CDC_EP_BULK_IN, pVcom->txBuf, pVcom->txlen );
+
+			// Mark buffer as empty and ready for more data
+			pVcom->txlen = 0;
+		}
+	}
+	*/
+	return LPC_OK;
 }
 
 /* USB handler for 'data received'.
@@ -240,8 +250,6 @@ ErrorCode_t VCOM_bulk_out_hdlr(USBD_HANDLE_T hUsb, void* data, uint32_t event)
         pVcom->rxlen = pUsbApi->hw->ReadEP(hUsb, USB_CDC_EP_BULK_OUT, pVcom->rxBuf);
         USB_CDC_receive( pVcom->rxBuf, pVcom->rxlen );
         pVcom->rxlen = 0;
-//        pVcom->send_fn(pVcom);
-//		UARTSend( (uint8_t*)"UART data\r\n", 11 );	/// JWJ
       } else {
         /* indicate bridge write buffer pending in USB buf */
         pVcom->usbrx_pend = 1;
@@ -257,5 +265,6 @@ ErrorCode_t VCOM_bulk_out_hdlr(USBD_HANDLE_T hUsb, void* data, uint32_t event)
  */
 void USB_IRQHandler(void)
 {
-  pUsbApi->hw->ISR(g_vCOM.hUsb);
+	// Forward request to appropriate method
+	pUsbApi->hw->ISR(g_vCOM.hUsb);
 }
