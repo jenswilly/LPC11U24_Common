@@ -35,7 +35,7 @@ typedef struct VCOM_DATA {
   uint8_t* txBuf;					// Buffer for data received on UART to be sent on USB
   volatile uint8_t ser_pos;
   volatile uint16_t rxlen;			// How many bytes have been received on USB
-  volatile uint16_t txlen;			// How many bytes have been received on UART
+  volatile uint32_t txlen;			// How many bytes have been received on UART
   VCOM_SEND_T send_fn;				// Function pointer to "send data" function
   volatile uint32_t sof_counter;
   volatile uint32_t last_ser_rx;
@@ -43,8 +43,10 @@ typedef struct VCOM_DATA {
   volatile uint16_t usbrx_pend;		// If set, there is data in USB buffer that has not yet been shifted into rxBuf
 } VCOM_DATA_T;
 
-// Global data structure
+// Global USB data structure
 VCOM_DATA_T g_vCOM;
+
+// RX and TX buffers in USB DMA RAM
 uint8_t rxbuf[USB_HS_MAX_BULK_PACKET] __attribute__((section("USBRAM")));
 uint8_t txbuf[USB_HS_MAX_BULK_PACKET] __attribute__((section("USBRAM")));
 
@@ -75,8 +77,6 @@ ErrorCode_t USB_CDC_init(void)
 	  /* initialize call back structures */
 	  memset((void*)&usb_param, 0, sizeof(USBD_API_INIT_PARAM_T));
 	  usb_param.usb_reg_base = LPC_USB_BASE;
-//	  usb_param.mem_base = 0x10001000;	// Top of RAM is at 0x10001800 for LPC11U2x/301 devices
-//	  usb_param.mem_size = 0x0800;		// 6 kb for LPC11U2x/301 devices
 	  usb_param.mem_base = 0x20004800;
 	  usb_param.mem_size = 0x0800;
 	  usb_param.max_num_ep = 3;
@@ -86,10 +86,6 @@ ErrorCode_t USB_CDC_init(void)
 	  memset((void*)&g_vCOM, 0, sizeof(VCOM_DATA_T));
 
 	  /* user defined functions */
-	#if defined(UART_BRIDGE)
-	  cdc_param.SetLineCode = VCOM_SetLineCode;
-	  usb_param.USB_SOF_Event = VCOM_sof_event;
-	#endif
 	  cdc_param.SendBreak = VCOM_SendBreak;
 
 	  /* Initialize Descriptor pointers */
@@ -118,11 +114,8 @@ ErrorCode_t USB_CDC_init(void)
 	/* store USB handle */
 	g_vCOM.hUsb = hUsb;
 	g_vCOM.hCdc = hCdc;
-//	g_vCOM.send_fn = VCOM_usb_send;
 
 	/* allocate transfer buffers */
-//	g_vCOM.rxBuf = (uint8_t*)(cdc_param.mem_base + (0 * USB_HS_MAX_BULK_PACKET));
-//	g_vCOM.txBuf = (uint8_t*)(cdc_param.mem_base + (1 * USB_HS_MAX_BULK_PACKET));
 	g_vCOM.rxBuf = rxbuf;
 	g_vCOM.txBuf = txbuf;
 	cdc_param.mem_size -= (4 * USB_HS_MAX_BULK_PACKET);
@@ -183,17 +176,6 @@ __attribute__((weak))void USB_CDC_receive( uint8_t *bufferPtr, uint32_t length )
 	// Data received Ð make your own method that actually does something. Oh, and don't make it __weak__ too..
 }
 
-/* Sends data in pVcom->txBuf on USB.
- * Length is pVcom->txlen.
- */
-#if 0
-void VCOM_usb_send(VCOM_DATA_T* pVcom)
-{
-  /* data received send it back */
-  pVcom->txlen -= pUsbApi->hw->WriteEP (pVcom->hUsb, USB_CDC_EP_BULK_IN, pVcom->txBuf, pVcom->txlen);
-}
-#endif
-
 ErrorCode_t VCOM_SendBreak (USBD_HANDLE_T hCDC, uint16_t mstime)
 {
   VCOM_DATA_T* pVcom = &g_vCOM;
@@ -216,21 +198,11 @@ ErrorCode_t VCOM_SendBreak (USBD_HANDLE_T hCDC, uint16_t mstime)
  */
 ErrorCode_t VCOM_bulk_in_hdlr(USBD_HANDLE_T hUsb, void* data, uint32_t event)
 {
-	/*
-	VCOM_DATA_T* pVcom = (VCOM_DATA_T*) data;
-	if (event == USB_EVT_IN)
+	if( event == USB_EVT_IN )
 	{
-		// If we have data in the pxbuf, send it
-		if( pVcom->txlen )
-		{
-			// Buffer non-empty: send it
-			pUsbApi->hw->WriteEP( pVcom->hUsb, USB_CDC_EP_BULK_IN, pVcom->txBuf, pVcom->txlen );
-
-			// Mark buffer as empty and ready for more data
-			pVcom->txlen = 0;
-		}
+		//	pUsbApi->hw->WriteEP( pVcom->hUsb, USB_CDC_EP_BULK_IN, pVcom->txBuf, pVcom->txlen );
 	}
-	*/
+
 	return LPC_OK;
 }
 
